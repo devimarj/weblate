@@ -1459,6 +1459,43 @@ Set to blank string to disable.
    :setting:`PRIVATE_COMMIT_EMAIL_OPT_IN`. Users can configure commit e-mail in
    the :ref:`profile`.
 
+.. setting:: PRIVATE_COMMIT_NAME_OPT_IN
+
+PRIVATE_COMMIT_NAME_OPT_IN
+--------------------------
+
+.. versionadded:: 5.1x
+
+Configures whether the private commit name is opt-in or opt-out (by default it is opt-in).
+
+.. hint::
+
+   This setting only applies to users which have not explicitly chosen a commit name.
+
+.. seealso::
+
+   * :ref:`profile`
+   * :setting:`PRIVATE_COMMIT_NAME_TEMPLATE`
+
+.. setting:: PRIVATE_COMMIT_NAME_TEMPLATE
+
+PRIVATE_COMMIT_NAME_TEMPLATE
+----------------------------
+
+.. versionadded:: 5.1x
+
+Template to generate private commit name for a user. Defaults to ``"{site_title} user {id}"``.
+
+It can contain placeholders like ``{id}``, ``{username}``, or ``{site_title}``.
+
+Set to blank string to disable.
+
+.. note::
+
+   Using a different commit name is opt-in for users unless configured by
+   :setting:`PRIVATE_COMMIT_NAME_OPT_IN`. Users can configure their commit name in
+   the :ref:`profile`.
+
 .. setting:: PROJECT_BACKUP_KEEP_COUNT
 
 PROJECT_BACKUP_KEEP_COUNT

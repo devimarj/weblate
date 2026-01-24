@@ -205,10 +205,19 @@ class CommitForm(ProfileBaseForm):
         required=False,
         widget=forms.RadioSelect,
     )
+    commit_name = forms.ChoiceField(
+        label=gettext_lazy("Commit name"),
+        choices=[("", gettext_lazy("Use account name"))],
+        help_text=gettext_lazy(
+            "Used in version-control commits. The name stays in the repository forever once changes are committed by Weblate."
+        ),
+        required=False,
+        widget=forms.RadioSelect,
+    )
 
     class Meta:
         model = Profile
-        fields = ("commit_email",)
+        fields = ("commit_email", "commit_name")
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -222,6 +231,24 @@ class CommitForm(ProfileBaseForm):
                 commit_emails.add(site_commit_email)
 
         self.fields["commit_email"].choices += [(x, x) for x in sorted(commit_emails)]
+
+        user_display = self.instance.user.get_visible_name()
+        site_commit_name = self.instance.get_site_commit_name()
+
+        names = set()
+        if site_commit_name:
+            if not settings.PRIVATE_COMMIT_NAME_OPT_IN:
+                self.fields["commit_name"].choices = [("", site_commit_name)]
+            else:
+                names.add(site_commit_name)
+
+        if user_display and user_display != site_commit_name:
+            names.add(user_display)
+
+        if self.instance.user.username and self.instance.user.username != site_commit_name:
+            names.add(self.instance.user.username)
+
+        self.fields["commit_name"].choices += [(x, x) for x in sorted(names)]
 
         self.helper = FormHelper(self)
         self.helper.disable_csrf = True

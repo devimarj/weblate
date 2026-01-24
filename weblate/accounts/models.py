@@ -124,6 +124,8 @@ class WeblateAccountsConf(AppConf):
 
     PRIVATE_COMMIT_EMAIL_TEMPLATE = "{username}@users.noreply.{site_domain}"
     PRIVATE_COMMIT_EMAIL_OPT_IN = True
+    PRIVATE_COMMIT_NAME_TEMPLATE = "{site_title} user {id}"
+    PRIVATE_COMMIT_NAME_OPT_IN = True
 
     # Auth0 provider default image & title on login page
     SOCIAL_AUTH_AUTH0_IMAGE = "auth0.svg"
@@ -856,6 +858,11 @@ class Profile(models.Model):
         blank=True,
         max_length=EMAIL_LENGTH,
     )
+    commit_name = models.CharField(
+        verbose_name=gettext_lazy("Commit name"),
+        blank=True,
+        max_length=200,
+    )
 
     last_2fa = models.CharField(
         choices=(
@@ -1134,6 +1141,28 @@ class Profile(models.Model):
 
     def get_site_commit_email(self) -> str:
         return format_private_email(self.user.username, self.user.pk)
+
+    def get_commit_name(self) -> str:
+        name = self.commit_name
+        if (
+            not name
+            and not settings.PRIVATE_COMMIT_NAME_OPT_IN
+            and not self.user.is_bot
+        ):
+            name = self.get_site_commit_name()
+        if not name:
+            name = self.user.get_visible_name()
+        return name
+
+    def get_site_commit_name(self) -> str:
+        if not settings.PRIVATE_COMMIT_NAME_TEMPLATE:
+            return ""
+
+        return settings.PRIVATE_COMMIT_NAME_TEMPLATE.format(
+            id=self.user.id,
+            username=self.user.username,
+            site_title=settings.SITE_TITLE,
+        )
 
     def _get_second_factors(self) -> Iterable[Device]:
         backend: type[Device]
