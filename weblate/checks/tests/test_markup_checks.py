@@ -10,6 +10,7 @@ from django.contrib.admindocs.utils import docutils_is_available
 
 from weblate.checks.markup import (
     BBCodeCheck,
+    HTMLAccessibilityCheck,
     LinkSecurityCheck,
     MarkdownLinkCheck,
     MarkdownRefLinkCheck,
@@ -1090,5 +1091,79 @@ class LinkSecurityCheckTest(CheckTestCase):
                 "Link",
                 '<a target="_blank" rel="noopener" href="https://ok.com">Click</a>',
                 "",
+            ),
+        )
+class HTMLAccessibilityCheckTest(CheckTestCase):
+    check = HTMLAccessibilityCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_good_matching = (
+            '<img src="a.jpg" alt="Cat">',
+            '<img src="a.jpg" alt="Gato">',
+            "xml-text",
+        )
+        self.test_failure_1 = (
+            '<img src="a.jpg" alt="Cat">',
+            '<img src="a.jpg" alt="">',
+            "xml-text",
+        )
+
+    def test_empty_attributes(self) -> None:
+        """Test detection of attributes emptied in translation."""
+        self.do_test(
+            True,
+            (
+                '<button aria-label="Close">X</button>',
+                '<button aria-label="">X</button>',
+                "xml-text",
+            ),
+        )
+        self.do_test(
+            True,
+            (
+                '<abbr title="World Health">WHO</abbr>',
+                '<abbr title="   ">OMS</abbr>',
+                "xml-text",
+            ),
+        )
+
+    def test_missing_attributes(self) -> None:
+        """Test detection of attributes completely removed."""
+        self.do_test(
+            True,
+            ('<img alt="Text">', "<img>", "xml-text"),
+        )
+
+    def test_nested_quotes(self) -> None:
+        """Test handling of nested quotes (e.g., apostrophes)."""
+        self.do_test(
+            False,
+            ('<img title="It\'s a cat">', '<img title="C\'est un chat">', "xml-text"),
+        )
+        self.do_test(
+            True,
+            ('<img title="It\'s a cat">', '<img title="">', "xml-text"),
+        )
+
+    def test_valid_cases(self) -> None:
+        """Test valid scenarios that should pass."""
+        self.do_test(
+            False,
+            ('<img alt="">', '<img alt="">', "xml-text"),
+        )
+        self.do_test(
+            False,
+            ('<img alt="Text">', "<div>Text</div>", "xml-text"),
+        )
+
+    def test_multiple_attributes(self) -> None:
+        """Test parsing of multiple attributes in a single tag."""
+        self.do_test(
+            True,
+            (
+                '<input placeholder="A" title="B">',
+                '<input placeholder="A" title="">',
+                "xml-text",
             ),
         )

@@ -806,3 +806,93 @@ class LinkSecurityCheck(TargetCheck):
 
         for match in HTML_ANCHOR_RE.finditer(source):
             yield match.start(), match.end(), match.group(0)
+class HTMLAccessibilityCheck(TargetCheck):
+    """
+    Check for accessibility regressions in HTML attributes.
+
+    Ensure textual attributes (alt, title, aria-label) are not emptied in translation.
+    """
+
+    check_id = "html-a11y"
+    name = gettext_lazy("HTML accessibility")
+    description = gettext_lazy(
+        "Detect accessibility attributes (alt, title, aria-label) "
+        "that have been emptied or removed in the translation."
+    )
+    severity = "warning"
+    default_disabled = False
+
+    A11Y_ATTRS = (
+        "alt",
+        "title",
+        "aria-label",
+        "aria-placeholder",
+        "aria-description",
+        "placeholder",
+    )
+
+    TAG_RE = re.compile(r"<([a-zA-Z0-9]+)(\s[^>]*)?>")
+
+    ATTR_HIGHLIGHT_RE = re.compile(
+        r'\b(alt|title|aria-[a-z]+|placeholder)\s*=\s*[\'"][^\'"]*[\'"]', re.IGNORECASE
+    )
+
+    @staticmethod
+    @lru_cache(maxsize=32)
+    def _get_attr_regex(attr_name: str) -> re.Pattern:
+        """
+        Compile and cache the regex for a specific attribute.
+
+        Use named backreference (?P=quote) to handle nested quotes correctly.
+        """
+        return re.compile(
+            rf"\b{attr_name}\s*=\s*(?P<quote>[\"\'])(?P<val>.*?)(?P=quote)",
+            re.IGNORECASE,
+        )
+
+    def _extract_attr(self, content: str, attr_name: str) -> str | None:
+        """Extract the value of a specific attribute handling nested quotes."""
+        if not content:
+            return None
+
+        pattern = self._get_attr_regex(attr_name)
+        match = pattern.search(content)
+        if match:
+            return match.group("val")
+        return None
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        src_iter = self.TAG_RE.finditer(source)
+        tgt_iter = self.TAG_RE.finditer(target)
+
+        # B905: Added strict=False to zip() for compatibility and linter satisfaction
+        for src_match, tgt_match in zip(src_iter, tgt_iter, strict=False):
+            src_tag = src_match.group(1).lower()
+            tgt_tag = tgt_match.group(1).lower()
+
+            # Skip comparison if tag order or structure changed significantly
+            if src_tag != tgt_tag:
+                continue
+
+            src_attrs = src_match.group(2) or ""
+            tgt_attrs = tgt_match.group(2) or ""
+
+            for attr in self.A11Y_ATTRS:
+                src_val = self._extract_attr(src_attrs, attr)
+
+                # Only trigger if the source attribute has a meaningful value
+                if src_val is not None and src_val.strip():
+                    tgt_val = self._extract_attr(tgt_attrs, attr)
+
+                    # Trigger if attribute is missing or empty in target
+                    if tgt_val is None or not tgt_val.strip():
+                        return True
+
+        return False
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+
+        for match in self.ATTR_HIGHLIGHT_RE.finditer(source):
+            yield match.start(), match.end(), match.group(0)

@@ -1169,6 +1169,7 @@ CHECK_LIST = [
     "weblate.checks.markup.SafeHTMLCheck",
     "weblate.checks.markup.RSTReferencesCheck",
     "weblate.checks.markup.RSTSyntaxCheck",
+    "weblate.checks.markup.HTMLAccessibilityCheck",
     "weblate.checks.markup.LinkSecurityCheck",
     "weblate.checks.placeholders.PlaceholderCheck",
     "weblate.checks.placeholders.RegexCheck",
