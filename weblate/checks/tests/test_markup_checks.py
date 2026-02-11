@@ -10,6 +10,7 @@ from django.contrib.admindocs.utils import docutils_is_available
 
 from weblate.checks.markup import (
     BBCodeCheck,
+    LinkSecurityCheck,
     MarkdownLinkCheck,
     MarkdownRefLinkCheck,
     MarkdownSyntaxCheck,
@@ -1000,5 +1001,94 @@ class RSTSyntaxCheckTest(CheckTestCase):
                 "- Text",
                 "+ Text",
                 "rst-text",
+            ),
+        )
+
+
+class LinkSecurityCheckTest(CheckTestCase):
+    check = LinkSecurityCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_good_matching = (
+            '<a href="https://weblate.org">Link</a>',
+            '<a href="https://weblate.org">Link</a>',
+            "",
+        )
+        self.test_failure_1 = (
+            "Link",
+            '<a href="https://site.com" target="_blank">Insecure</a>',
+            "",
+        )
+
+    def test_reverse_tabnabbing(self) -> None:
+        """Test detection of target='_blank' without security attributes."""
+        self.do_test(
+            True,
+            ("Link", '<a href="https://bad.com" target="_blank">Click</a>', ""),
+        )
+        self.do_test(
+            False,
+            (
+                "Link",
+                '<a href="https://good.com" target="_blank" rel="noopener">Click</a>',
+                "",
+            ),
+        )
+        self.do_test(
+            False,
+            (
+                "Link",
+                '<a href="https://good.com" target="_blank" rel="noreferrer">Click</a>',
+                "",
+            ),
+        )
+
+    def test_protocol_downgrade(self) -> None:
+        """Test detection of HTTPS source downgrading to HTTP target."""
+        self.do_test(
+            True,
+            ('<a href="https://s.com">', '<a href="http://s.com">', ""),
+        )
+        self.do_test(
+            False,
+            ('<a href="http://s.com">', '<a href="http://s.com">', ""),
+        )
+        self.do_test(
+            False,
+            ('<a href="https://s.com">', '<a href="https://s.com">', ""),
+        )
+
+    def test_smart_filtering(self) -> None:
+        """Test ensuring no false positives on internal/non-web links."""
+        self.do_test(
+            False,
+            ("Link", '<a href="/contact" target="_blank">Internal</a>', ""),
+        )
+        self.do_test(
+            False,
+            ("Link", '<a href="javascript:alert(1)">XSS</a>', ""),
+        )
+        self.do_test(
+            False,
+            ("Link", "<a %(attrs)s>Variable</a>", ""),
+        )
+        self.do_test(
+            False,
+            ("[Link](https://a.com)", "[Link](http://a.com)", "md-text"),
+        )
+
+    def test_weird_html_formatting(self) -> None:
+        """Test robust handling of uppercase attributes and single quotes."""
+        self.do_test(
+            True,
+            ("Link", "<A HREF='https://bad.com' TARGET='_BLANK'>Click</A>", ""),
+        )
+        self.do_test(
+            False,
+            (
+                "Link",
+                '<a target="_blank" rel="noopener" href="https://ok.com">Click</a>',
+                "",
             ),
         )

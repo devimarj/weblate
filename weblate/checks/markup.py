@@ -68,6 +68,9 @@ BBCODE_MATCH = re.compile(
 )
 
 
+HTML_ANCHOR_RE = re.compile(r"<a\s+([^>]+)>", re.IGNORECASE)
+
+
 XML_MATCH = re.compile(r"<[^>]+>")
 XML_ENTITY_MATCH = re.compile(
     r"""
@@ -743,3 +746,63 @@ class RSTSyntaxCheck(RSTBaseCheck):
                 ((error,) for error in errors),
             )
         return super().get_description(check_obj)
+
+
+class LinkSecurityCheck(TargetCheck):
+    """
+    Check for security regressions and missing safety attributes in HTML links.
+
+    Focus: Prevent 'Reverse Tabnabbing' and Protocol Downgrades (HTTPS->HTTP).
+    """
+
+    check_id = "link-security"
+    name = gettext_lazy("Link security")
+    description = gettext_lazy(
+        "Detect insecure protocol downgrades (HTTPS to HTTP) and missing 'noopener' "
+        "attributes in external links opening in new tabs."
+    )
+    severity = "warning"
+    default_disabled = False
+
+    def _is_insecure(self, attrs: str, source_has_https: bool) -> bool:
+        """Determine if link attributes are insecure."""
+        attrs = attrs.lower()
+
+        # Heuristic: treat any link starting with http/s as external
+        is_external = bool(re.search(r'href\s*=\s*[\'"]http', attrs))
+
+        # Check for Reverse Tabnabbing (target="_blank" without protection)
+        if (
+            is_external
+            and re.search(r'target\s*=\s*[\'"]_blank[\'"]', attrs)
+            and "noopener" not in attrs
+            and "noreferrer" not in attrs
+        ):
+            return True
+
+        # Check for Protocol Downgrade (HTTPS to HTTP)
+        return bool(source_has_https and re.search(r'href\s*=\s*[\'"]http:', attrs))
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        # Optimization: Fail fast if no anchor tags exist (case-insensitive)
+        if "<a" not in target.lower():
+            return False
+
+        check_target = target
+        if "md-text" in unit.all_flags:
+            check_target = MD_LINK.sub("", target)
+
+        source_has_https = "https://" in source
+
+        for match in HTML_ANCHOR_RE.finditer(check_target):
+            if self._is_insecure(match.group(1), source_has_https):
+                return True
+
+        return False
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+
+        for match in HTML_ANCHOR_RE.finditer(source):
+            yield match.start(), match.end(), match.group(0)

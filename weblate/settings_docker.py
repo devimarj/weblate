@@ -1169,6 +1169,7 @@ CHECK_LIST = [
     "weblate.checks.markup.SafeHTMLCheck",
     "weblate.checks.markup.RSTReferencesCheck",
     "weblate.checks.markup.RSTSyntaxCheck",
+    "weblate.checks.markup.LinkSecurityCheck",
     "weblate.checks.placeholders.PlaceholderCheck",
     "weblate.checks.placeholders.RegexCheck",
     "weblate.checks.duplicate.DuplicateCheck",
@@ -1185,6 +1186,7 @@ CHECK_LIST = [
     "weblate.checks.fluent.references.FluentReferencesCheck",
     "weblate.checks.fluent.inner_html.FluentSourceInnerHTMLCheck",
     "weblate.checks.fluent.inner_html.FluentTargetInnerHTMLCheck",
+
 ]
 modify_env_list(CHECK_LIST, "CHECK")
 
