@@ -116,6 +116,7 @@ class WeblateChecksConf(AppConf):
         "weblate.checks.markup.RSTSyntaxCheck",
         "weblate.checks.markup.HTMLAccessibilityCheck",
         "weblate.checks.markup.LinkSecurityCheck",
+        "weblate.checks.markup.LinkProtocolCheck",
         "weblate.checks.placeholders.PlaceholderCheck",
         "weblate.checks.placeholders.RegexCheck",
         "weblate.checks.duplicate.DuplicateCheck",

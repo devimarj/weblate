@@ -806,6 +806,61 @@ class LinkSecurityCheck(TargetCheck):
 
         for match in HTML_ANCHOR_RE.finditer(source):
             yield match.start(), match.end(), match.group(0)
+
+
+class LinkProtocolCheck(TargetCheck):
+    """
+    Check for integrity in communication protocols (tel, mailto, sms).
+
+    Covers both HTML (href="...") and Markdown ([...](...)) syntaxes.
+    """
+
+    check_id = "link-protocol"
+    name = gettext_lazy("Communication link integrity")
+    description = gettext_lazy(
+        "Detect broken communication links (tel:, mailto:, sms:) containing "
+        "spaces or invalid characters in HTML or Markdown."
+    )
+    severity = "warning"
+    default_disabled = False
+
+    PROTOCOL_LINK_RE = re.compile(
+        r'(?:href\s*=\s*[\'"]|\]\()(?P<proto>tel:|mailto:|sms:)(?P<value>[^\'\"\)]+)',
+        re.IGNORECASE,
+    )
+
+    # Detect illegal characters in phone numbers.
+    # Allows 'p' (pause) and 'w' (wait) for enterprise systems, blocks other letters.
+    _ILLEGAL_TEL_CHARS = re.compile(r"[a-oq-vxyzA-OQ-VXYZ]")
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        for match in self.PROTOCOL_LINK_RE.finditer(target):
+            proto = match.group("proto").lower()
+            value = match.group("value")
+
+            # Strip query params (e.g. ?subject=) to avoid false positives
+            clean_value = value.split("?", 1)[0] if "?" in value else value
+
+            # Check for literal spaces or encoded spaces
+            if " " in clean_value or "%20" in clean_value:
+                return True
+
+            # Check for illegal alphabetic characters in phone numbers
+            if proto in {"tel:", "sms:"} and self._ILLEGAL_TEL_CHARS.search(
+                clean_value
+            ):
+                return True
+
+        return False
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+
+        for match in self.PROTOCOL_LINK_RE.finditer(source):
+            yield match.start(), match.end(), match.group(0)
+
+
 class HTMLAccessibilityCheck(TargetCheck):
     """
     Check for accessibility regressions in HTML attributes.

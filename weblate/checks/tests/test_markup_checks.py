@@ -11,6 +11,7 @@ from django.contrib.admindocs.utils import docutils_is_available
 from weblate.checks.markup import (
     BBCodeCheck,
     HTMLAccessibilityCheck,
+    LinkProtocolCheck,
     LinkSecurityCheck,
     MarkdownLinkCheck,
     MarkdownRefLinkCheck,
@@ -1093,6 +1094,88 @@ class LinkSecurityCheckTest(CheckTestCase):
                 "",
             ),
         )
+
+
+class LinkProtocolCheckTest(CheckTestCase):
+    check = LinkProtocolCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_good_matching = (
+            '<a href="tel:+34123">Call</a>',
+            '<a href="tel:+34123">Llamar</a>',
+            "",
+        )
+        self.test_failure_1 = (
+            '<a href="tel:+34123">Call</a>',
+            '<a href="tel:+34 123">Space</a>',
+            "",
+        )
+
+    def test_html_protocols(self) -> None:
+        """Test integrity of HTML href protocols."""
+        self.do_test(
+            True,
+            ("", '<a href="tel: +123">Bad</a>', ""),
+        )
+        self.do_test(
+            True,
+            ("", '<a href="tel:123-ABC">Bad</a>', ""),
+        )
+        self.do_test(
+            False,
+            ("", '<a href="tel:+1-(555)-123.456">Good</a>', ""),
+        )
+
+    def test_enterprise_protocols(self) -> None:
+        """Test support for enterprise telephony features (pause/wait)."""
+        self.do_test(
+            False,
+            ("", '<a href="tel:900123p1">Extension</a>', ""),
+        )
+        self.do_test(
+            False,
+            ("", '<a href="tel:+1555w1234#">Conference</a>', ""),
+        )
+        self.do_test(
+            True,
+            ("", '<a href="tel:123Ext456">Bad</a>', ""),
+        )
+
+    def test_encoded_spaces(self) -> None:
+        """Test detection of %20 (encoded spaces)."""
+        self.do_test(
+            True,
+            ("", '<a href="tel:123%20456">Bad</a>', ""),
+        )
+        self.do_test(
+            True,
+            ("", '<a href="mailto:user%20name@domain.com">Bad</a>', ""),
+        )
+
+    def test_query_params_ignored(self) -> None:
+        """Test that spaces in query params (like subject) are ignored."""
+        self.do_test(
+            False,
+            ("", '<a href="mailto:user@domain.com?subject=Hola Mundo">Good</a>', ""),
+        )
+        self.do_test(
+            False,
+            ("", '<a href="mailto:user@domain.com?body=Hello%20World">Good</a>', ""),
+        )
+
+    def test_markdown_protocols(self) -> None:
+        """Test validation on Markdown link syntax."""
+        self.do_test(
+            True,
+            ("", "[Call](tel: 123)", "md-text"),
+        )
+        self.do_test(
+            False,
+            ("", "[Call](tel:+123)", "md-text"),
+        )
+
+
 class HTMLAccessibilityCheckTest(CheckTestCase):
     check = HTMLAccessibilityCheck()
 
